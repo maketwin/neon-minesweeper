@@ -1,13 +1,38 @@
+import { useEffect, useState } from 'react'
 import type { GameStatus } from '../engine'
 
 interface OverlayProps {
   status: GameStatus
   seconds: number
   onRestart: () => void
+  /** Delay before showing so board FX can play (ms) */
+  appearDelayMs?: number
 }
 
-export default function Overlay({ status, seconds, onRestart }: OverlayProps) {
-  if (status !== 'won' && status !== 'lost') return null
+export default function Overlay({
+  status,
+  seconds,
+  onRestart,
+  appearDelayMs = 0,
+}: OverlayProps) {
+  const terminal = status === 'won' || status === 'lost'
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    if (!terminal) {
+      setVisible(false)
+      return
+    }
+    if (appearDelayMs <= 0) {
+      setVisible(true)
+      return
+    }
+    setVisible(false)
+    const t = window.setTimeout(() => setVisible(true), appearDelayMs)
+    return () => window.clearTimeout(t)
+  }, [status, terminal, appearDelayMs])
+
+  if (!terminal || !visible) return null
 
   const won = status === 'won'
 

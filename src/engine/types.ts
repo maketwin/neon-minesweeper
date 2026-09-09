@@ -19,6 +19,11 @@ export interface DifficultyConfig {
   label: string
 }
 
+export interface DeathCell {
+  row: number
+  col: number
+}
+
 export interface GameState {
   board: Cell[][]
   rows: number
@@ -30,6 +35,8 @@ export interface GameState {
   difficulty: Difficulty
   /** True after mines have been placed (after first click) */
   minesPlaced: boolean
+  /** Cell that triggered a loss (mine hit), if any */
+  deathCell: DeathCell | null
 }
 
 export const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {

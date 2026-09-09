@@ -29,6 +29,7 @@ export function createGame(difficulty: Difficulty = 'beginner'): GameState {
     revealedCount: 0,
     difficulty,
     minesPlaced: false,
+    deathCell: null,
   }
 }
 
@@ -101,6 +102,7 @@ function cloneState(state: GameState): GameState {
   return {
     ...state,
     board: cloneBoard(state.board),
+    deathCell: state.deathCell ? { ...state.deathCell } : null,
   }
 }
 
@@ -125,6 +127,7 @@ export function revealCell(state: GameState, row: number, col: number): GameStat
 
   if (cell.isMine) {
     cell.state = 'revealed'
+    next.deathCell = { row, col }
     for (let r = 0; r < next.rows; r++) {
       for (let c = 0; c < next.cols; c++) {
         if (next.board[r][c].isMine) {

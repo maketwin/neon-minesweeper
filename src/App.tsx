@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   chordCell,
   createGame,
@@ -9,13 +9,14 @@ import {
   type GameState,
 } from './engine'
 import Board from './components/Board'
-import HUD from './components/HUD'
+import HUD, { type EffectsMode } from './components/HUD'
 import Overlay from './components/Overlay'
 
 export default function App() {
   const [difficulty, setDifficulty] = useState<Difficulty>('beginner')
   const [game, setGame] = useState<GameState>(() => createGame('beginner'))
   const [seconds, setSeconds] = useState(0)
+  const [effects, setEffects] = useState<EffectsMode>('full')
   const timerRef = useRef<number | null>(null)
   const startedRef = useRef(false)
 
@@ -102,8 +103,22 @@ export default function App() {
   const cellSize =
     difficulty === 'expert' ? '22px' : difficulty === 'intermediate' ? '28px' : '36px'
 
+  // Let board FX play before overlay: lose ripple ~450ms; win cascade scales with board
+  const overlayDelayMs = useMemo(() => {
+    if (game.status === 'lost') return 480
+    if (game.status === 'won') {
+      const maxDist = Math.floor(game.rows / 2) + Math.floor(game.cols / 2)
+      return Math.min(1200, 200 + maxDist * 40)
+    }
+    return 0
+  }, [game.status, game.rows, game.cols])
+
   return (
-    <div className="app" style={{ '--cell-size': cellSize } as React.CSSProperties}>
+    <div
+      className="app"
+      data-effects={effects}
+      style={{ '--cell-size': cellSize } as React.CSSProperties}
+    >
       <div className="app__glow" aria-hidden />
       <main className="app__panel">
         <h1 className="app__title">
@@ -114,8 +129,10 @@ export default function App() {
           remaining={remainingMines(game)}
           seconds={seconds}
           status={game.status}
+          effects={effects}
           onDifficultyChange={handleDifficultyChange}
           onRestart={() => resetGame()}
+          onEffectsChange={setEffects}
         />
         <div className="app__board-wrap">
           <Board
@@ -128,6 +145,7 @@ export default function App() {
             status={game.status}
             seconds={seconds}
             onRestart={() => resetGame()}
+            appearDelayMs={overlayDelayMs}
           />
         </div>
         <p className="app__hint">

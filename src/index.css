@@ -25,6 +25,11 @@
   --n8: #a0a8b8;
   --cell-size: 36px;
   --radius: 12px;
+  /* FX timing (slice 2) */
+  --fx-flip: 150ms;
+  --fx-flag: 200ms;
+  --fx-explode: 450ms;
+  --fx-cascade-step: 40ms;
   font-family: 'Rajdhani', system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -246,6 +251,7 @@ button {
 
 /* —— Cell —— */
 .cell {
+  position: relative;
   width: var(--cell-size);
   height: var(--cell-size);
   display: grid;
@@ -255,11 +261,13 @@ button {
   font-weight: 700;
   font-size: calc(var(--cell-size) * 0.45);
   padding: 0;
+  overflow: hidden;
   transition:
     background 0.12s,
     transform 0.08s,
     box-shadow 0.12s,
-    border-color 0.12s;
+    border-color 0.12s,
+    filter 0.12s;
   border: 1px solid transparent;
 }
 
@@ -269,19 +277,41 @@ button {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+/* Hover / press microfeedback */
 .cell--hidden:hover {
   background: var(--cell-hidden-hover);
   border-color: var(--neon-dim);
   box-shadow: 0 0 8px rgba(0, 229, 255, 0.2);
+  transform: translateY(-1px);
 }
 
 .cell--hidden:active {
   transform: scale(0.92);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
 .cell--revealed {
   background: var(--cell-revealed);
   border-color: rgba(255, 255, 255, 0.04);
+}
+
+/* Flip open: 120–180ms */
+.cell--flip {
+  animation: cellFlip var(--fx-flip) ease-out;
+  transform-origin: center center;
+}
+
+@keyframes cellFlip {
+  0% {
+    transform: rotateX(72deg) scale(0.92);
+    opacity: 0.35;
+    filter: brightness(1.4);
+  }
+  100% {
+    transform: rotateX(0deg) scale(1);
+    opacity: 1;
+    filter: brightness(1);
+  }
 }
 
 .cell--flagged {
@@ -291,6 +321,49 @@ button {
 
 .cell--flagged:hover {
   border-color: var(--flag);
+  transform: translateY(-1px);
+}
+
+.cell--flagged:active {
+  transform: scale(0.94);
+}
+
+/* Flag place/remove pop: 200ms */
+.cell--flag-pop {
+  animation: flagPop var(--fx-flag) cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+.cell--flag-pop .cell__icon--flag {
+  animation: flagIconPop var(--fx-flag) cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+@keyframes flagPop {
+  0% {
+    transform: scale(0.85);
+    box-shadow: 0 0 0 rgba(255, 193, 74, 0);
+  }
+  45% {
+    transform: scale(1.12);
+    box-shadow: 0 0 14px rgba(255, 193, 74, 0.55);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(255, 193, 74, 0);
+  }
+}
+
+@keyframes flagIconPop {
+  0% {
+    transform: scale(0.4) rotate(-18deg);
+    opacity: 0.4;
+  }
+  55% {
+    transform: scale(1.2) rotate(6deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
 }
 
 .cell--mine {
@@ -298,18 +371,117 @@ button {
   border-color: var(--mine);
 }
 
-.cell--exploded {
-  background: rgba(255, 59, 107, 0.45);
+/* Death cell: mine ripple explosion 400–500ms */
+.cell--exploded.cell--death {
+  background: rgba(255, 59, 107, 0.55);
   box-shadow: var(--mine-glow);
-  animation: explode 0.35s ease-out;
+  z-index: 2;
+  animation: deathExplode var(--fx-explode) ease-out;
 }
 
-@keyframes explode {
+.cell__ripple {
+  position: absolute;
+  inset: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  border: 2px solid var(--mine);
+  pointer-events: none;
+  animation: mineRipple var(--fx-explode) ease-out forwards;
+}
+
+@keyframes deathExplode {
   0% {
-    transform: scale(1.2);
+    transform: scale(1);
+    filter: brightness(2);
+    box-shadow: 0 0 0 0 rgba(255, 59, 107, 0.8);
+  }
+  35% {
+    transform: scale(1.28);
+    filter: brightness(1.6);
+    box-shadow: 0 0 22px 4px rgba(255, 59, 107, 0.75);
   }
   100% {
     transform: scale(1);
+    filter: brightness(1);
+    box-shadow: var(--mine-glow);
+  }
+}
+
+@keyframes mineRipple {
+  0% {
+    transform: scale(0.4);
+    opacity: 1;
+    border-width: 3px;
+  }
+  100% {
+    transform: scale(5.5);
+    opacity: 0;
+    border-width: 1px;
+  }
+}
+
+/* Other mines on lose: staggered ripple reveal */
+.cell--mine-ripple {
+  animation: mineReveal 320ms ease-out both;
+  animation-delay: calc(var(--stagger, 0) * 28ms);
+}
+
+@keyframes mineReveal {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+    box-shadow: 0 0 0 rgba(255, 59, 107, 0);
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(255, 59, 107, 0.55);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Win: cascade highlight, 30–50ms per cell */
+.cell--win-cascade {
+  animation: winCascade 360ms ease-out both;
+  animation-delay: calc(var(--stagger, 0) * var(--fx-cascade-step));
+}
+
+@keyframes winCascade {
+  0% {
+    box-shadow: inset 0 0 0 0 rgba(0, 229, 255, 0);
+    filter: brightness(1);
+  }
+  40% {
+    box-shadow:
+      inset 0 0 0 1px rgba(0, 229, 255, 0.65),
+      0 0 12px rgba(0, 229, 255, 0.45);
+    filter: brightness(1.35);
+    border-color: var(--neon);
+  }
+  100% {
+    box-shadow: inset 0 0 0 0 rgba(0, 229, 255, 0);
+    filter: brightness(1);
+  }
+}
+
+.board--won .cell--flagged {
+  animation: winFlagGlow 420ms ease-out both;
+  animation-delay: calc(var(--stagger, 0) * var(--fx-cascade-step));
+}
+
+@keyframes winFlagGlow {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+  45% {
+    box-shadow: 0 0 14px rgba(255, 193, 74, 0.65);
+    border-color: var(--flag);
   }
 }
 
@@ -317,6 +489,7 @@ button {
   color: var(--flag);
   text-shadow: var(--flag-glow);
   font-size: 1.05em;
+  display: inline-block;
 }
 
 .cell__icon--mine {
@@ -428,6 +601,40 @@ button {
 
 .overlay__btn:active {
   transform: scale(0.97);
+}
+
+/* Future hook: reduce / disable motion via data-effects on .app */
+.app[data-effects='off'] .cell--flip,
+.app[data-effects='off'] .cell--flag-pop,
+.app[data-effects='off'] .cell--flag-pop .cell__icon--flag,
+.app[data-effects='off'] .cell--exploded.cell--death,
+.app[data-effects='off'] .cell__ripple,
+.app[data-effects='off'] .cell--mine-ripple,
+.app[data-effects='off'] .cell--win-cascade,
+.app[data-effects='off'] .board--won .cell--flagged {
+  animation: none !important;
+}
+
+.app[data-effects='reduced'] .cell--flip,
+.app[data-effects='reduced'] .cell--flag-pop,
+.app[data-effects='reduced'] .cell--mine-ripple,
+.app[data-effects='reduced'] .cell--win-cascade {
+  animation-duration: 1ms !important;
+  animation-delay: 0ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app[data-effects='full'] .cell--flip,
+  .app[data-effects='full'] .cell--flag-pop,
+  .app[data-effects='full'] .cell--flag-pop .cell__icon--flag,
+  .app[data-effects='full'] .cell--exploded.cell--death,
+  .app[data-effects='full'] .cell__ripple,
+  .app[data-effects='full'] .cell--mine-ripple,
+  .app[data-effects='full'] .cell--win-cascade,
+  .app[data-effects='full'] .board--won .cell--flagged {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
 }
 
 @media (max-width: 640px) {

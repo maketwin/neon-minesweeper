@@ -1,13 +1,17 @@
 import type { Difficulty, GameStatus } from '../engine'
 import { DIFFICULTIES } from '../engine'
 
+export type EffectsMode = 'full' | 'reduced' | 'off'
+
 interface HUDProps {
   difficulty: Difficulty
   remaining: number
   seconds: number
   status: GameStatus
+  effects: EffectsMode
   onDifficultyChange: (d: Difficulty) => void
   onRestart: () => void
+  onEffectsChange: (e: EffectsMode) => void
 }
 
 function faceForStatus(status: GameStatus): string {
@@ -23,16 +27,30 @@ function faceForStatus(status: GameStatus): string {
   }
 }
 
+const EFFECTS_LABELS: Record<EffectsMode, string> = {
+  full: 'FX Full',
+  reduced: 'FX Low',
+  off: 'FX Off',
+}
+
 export default function HUD({
   difficulty,
   remaining,
   seconds,
   status,
+  effects,
   onDifficultyChange,
   onRestart,
+  onEffectsChange,
 }: HUDProps) {
   const timeDisplay = String(Math.min(seconds, 999)).padStart(3, '0')
   const mineDisplay = String(Math.min(remaining, 999)).padStart(3, '0')
+
+  const cycleEffects = () => {
+    const order: EffectsMode[] = ['full', 'reduced', 'off']
+    const i = order.indexOf(effects)
+    onEffectsChange(order[(i + 1) % order.length])
+  }
 
   return (
     <header className="hud">
@@ -47,6 +65,15 @@ export default function HUD({
             {DIFFICULTIES[key].label}
           </button>
         ))}
+        <button
+          type="button"
+          className="hud__diff-btn hud__fx-btn"
+          onClick={cycleEffects}
+          title="Toggle effects (full / low / off) for weaker devices"
+          aria-label={`Effects mode: ${effects}`}
+        >
+          {EFFECTS_LABELS[effects]}
+        </button>
       </div>
 
       <div className="hud__stats">
