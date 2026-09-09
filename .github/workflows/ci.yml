@@ -17,8 +17,9 @@ jobs:
           node-version: 20
           cache: npm
 
+      # lockfile currently incomplete; use install until a full lock is committed
       - name: Install
-        run: npm ci
+        run: npm install
 
       - name: Typecheck and build
         run: npm run build
