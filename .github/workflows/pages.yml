@@ -1,5 +1,6 @@
 name: Deploy Pages
 
+# Trigger after Pages source enabled
 on:
   push:
     branches: [main]
