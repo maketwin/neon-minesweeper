@@ -8,6 +8,7 @@ import {
   type Difficulty,
   type GameState,
 } from './engine'
+import { track } from './analytics'
 import Board from './components/Board'
 import HUD, { type EffectsMode } from './components/HUD'
 import Overlay from './components/Overlay'
@@ -19,6 +20,20 @@ export default function App() {
   const [effects, setEffects] = useState<EffectsMode>('full')
   const timerRef = useRef<number | null>(null)
   const startedRef = useRef(false)
+  const secondsRef = useRef(0)
+  const endTrackedRef = useRef(false)
+  const appLoadRef = useRef(false)
+
+  useEffect(() => {
+    secondsRef.current = seconds
+  }, [seconds])
+
+  // app_load — once on mount
+  useEffect(() => {
+    if (appLoadRef.current) return
+    appLoadRef.current = true
+    track('app_load', { ts: Date.now() })
+  }, [])
 
   const stopTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -30,25 +45,38 @@ export default function App() {
   const startTimer = useCallback(() => {
     if (startedRef.current) return
     startedRef.current = true
+    track('game_start', { difficulty })
     timerRef.current = window.setInterval(() => {
       setSeconds((s) => s + 1)
     }, 1000)
-  }, [])
+  }, [difficulty])
 
   const resetGame = useCallback((d: Difficulty = difficulty) => {
     stopTimer()
     startedRef.current = false
+    endTrackedRef.current = false
     setSeconds(0)
     setGame(createGame(d))
   }, [difficulty, stopTimer])
 
   const handleDifficultyChange = useCallback(
     (d: Difficulty) => {
+      track('difficulty_change', { difficulty: d })
       setDifficulty(d)
       resetGame(d)
     },
     [resetGame]
   )
+
+  const handleRestart = useCallback(() => {
+    track('game_restart', { difficulty })
+    resetGame()
+  }, [difficulty, resetGame])
+
+  const handleEffectsChange = useCallback((mode: EffectsMode) => {
+    track('fx_mode_change', { mode })
+    setEffects(mode)
+  }, [])
 
   const handleReveal = useCallback(
     (row: number, col: number) => {
@@ -57,7 +85,7 @@ export default function App() {
         const cell = prev.board[row][col]
         if (cell.state === 'revealed' || cell.state === 'flagged') return prev
 
-        // Timer starts on first reveal
+        // Timer + game_start on first reveal of the round
         if (!prev.minesPlaced || prev.status === 'ready') {
           startTimer()
         }
@@ -89,12 +117,17 @@ export default function App() {
     [startTimer]
   )
 
-  // Stop timer on win/lose
+  // Stop timer + track win/lose once per round
   useEffect(() => {
     if (game.status === 'won' || game.status === 'lost') {
       stopTimer()
+      if (!endTrackedRef.current) {
+        endTrackedRef.current = true
+        const payload = { difficulty, seconds: secondsRef.current }
+        track(game.status === 'won' ? 'game_win' : 'game_lose', payload)
+      }
     }
-  }, [game.status, stopTimer])
+  }, [game.status, difficulty, stopTimer])
 
   // Cleanup on unmount
   useEffect(() => () => stopTimer(), [stopTimer])
@@ -131,8 +164,8 @@ export default function App() {
           status={game.status}
           effects={effects}
           onDifficultyChange={handleDifficultyChange}
-          onRestart={() => resetGame()}
-          onEffectsChange={setEffects}
+          onRestart={handleRestart}
+          onEffectsChange={handleEffectsChange}
         />
         <div className="app__board-wrap">
           <Board
@@ -144,7 +177,7 @@ export default function App() {
           <Overlay
             status={game.status}
             seconds={seconds}
-            onRestart={() => resetGame()}
+            onRestart={handleRestart}
             appearDelayMs={overlayDelayMs}
           />
         </div>
